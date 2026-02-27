@@ -5,6 +5,7 @@ import pytest
 
 from mcp_email_server.app import (
     add_email_account,
+    create_draft,
     delete_emails,
     download_attachment,
     get_emails_content,
@@ -544,3 +545,93 @@ class TestMcpTools:
             )
 
             assert result.emails[0].message_id == "<test@example.com>"
+
+
+class TestCreateDraft:
+    @pytest.mark.asyncio
+    async def test_create_draft(self):
+        """Test create_draft MCP tool."""
+        mock_handler = AsyncMock()
+        mock_handler.create_draft.return_value = "Drafts"
+
+        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+            result = await create_draft(
+                account_name="test_account",
+                recipients=["recipient@example.com"],
+                subject="Draft Subject",
+                body="Draft Body",
+                cc=["cc@example.com"],
+            )
+
+            assert "Draft saved successfully" in result
+            assert "Drafts" in result
+            assert "recipient@example.com" in result
+
+            mock_handler.create_draft.assert_called_once_with(
+                ["recipient@example.com"],
+                "Draft Subject",
+                "Draft Body",
+                ["cc@example.com"],
+                None,
+                False,
+                None,
+                None,
+                None,
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_draft_allowed_in_read_only_mode(self):
+        """Test that create_draft works even when read_only is True."""
+        mock_handler = AsyncMock()
+        mock_handler.create_draft.return_value = "Drafts"
+
+        # create_draft does not check read_only, so we only need to mock dispatch_handler
+        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+            result = await create_draft(
+                account_name="test_account",
+                recipients=["recipient@example.com"],
+                subject="Draft Subject",
+                body="Draft Body",
+            )
+
+            assert "Draft saved successfully" in result
+            mock_handler.create_draft.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_draft_with_attachments(self):
+        """Test create_draft MCP tool with attachments."""
+        mock_handler = AsyncMock()
+        mock_handler.create_draft.return_value = "INBOX.Drafts"
+
+        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+            result = await create_draft(
+                account_name="test_account",
+                recipients=["recipient@example.com"],
+                subject="Draft with attachment",
+                body="See attached",
+                attachments=["/tmp/file.pdf"],
+            )
+
+            assert "Draft saved successfully" in result
+            assert "INBOX.Drafts" in result
+            assert "1 attachment(s)" in result
+
+    @pytest.mark.asyncio
+    async def test_create_draft_with_reply_headers(self):
+        """Test create_draft with reply threading headers."""
+        mock_handler = AsyncMock()
+        mock_handler.create_draft.return_value = "Drafts"
+
+        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+            result = await create_draft(
+                account_name="test_account",
+                recipients=["recipient@example.com"],
+                subject="Re: Original Subject",
+                body="Reply body",
+                in_reply_to="<original@example.com>",
+                references="<original@example.com>",
+            )
+
+            assert "Draft saved successfully" in result
+            call_args = mock_handler.create_draft.call_args
+            assert "<original@example.com>" in str(call_args)

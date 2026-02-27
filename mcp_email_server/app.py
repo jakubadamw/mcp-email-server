@@ -177,6 +177,65 @@ async def send_email(
 
 
 @mcp.tool(
+    description="Create a draft email and save it to the Drafts folder. This operation is always available, even in read-only mode.",
+)
+async def create_draft(
+    account_name: Annotated[str, Field(description="The name of the email account to create the draft in.")],
+    recipients: Annotated[list[str], Field(description="A list of recipient email addresses.")],
+    subject: Annotated[str, Field(description="The subject of the email.")],
+    body: Annotated[str, Field(description="The body of the email.")],
+    cc: Annotated[
+        list[str] | None,
+        Field(default=None, description="A list of CC email addresses."),
+    ] = None,
+    bcc: Annotated[
+        list[str] | None,
+        Field(default=None, description="A list of BCC email addresses."),
+    ] = None,
+    html: Annotated[
+        bool,
+        Field(default=False, description="Whether the body is HTML (True) or plain text (False)."),
+    ] = False,
+    attachments: Annotated[
+        list[str] | None,
+        Field(
+            default=None,
+            description="A list of absolute file paths to attach to the draft.",
+        ),
+    ] = None,
+    in_reply_to: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Message-ID of the email being replied to. Enables proper threading in email clients.",
+        ),
+    ] = None,
+    references: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="Space-separated Message-IDs for the thread chain. Usually includes in_reply_to plus ancestors.",
+        ),
+    ] = None,
+) -> str:
+    handler = dispatch_handler(account_name)
+    drafts_folder = await handler.create_draft(
+        recipients,
+        subject,
+        body,
+        cc,
+        bcc,
+        html,
+        attachments,
+        in_reply_to,
+        references,
+    )
+    recipient_str = ", ".join(recipients)
+    attachment_info = f" with {len(attachments)} attachment(s)" if attachments else ""
+    return f"Draft saved successfully to '{drafts_folder}' for {recipient_str}{attachment_info}"
+
+
+@mcp.tool(
     description="Delete one or more emails by their email_id. Use list_emails_metadata first to get the email_id."
 )
 async def delete_emails(

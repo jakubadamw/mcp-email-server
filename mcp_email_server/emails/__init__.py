@@ -86,6 +86,37 @@ class EmailHandler(abc.ABC):
         """
 
     @abc.abstractmethod
+    async def create_draft(
+        self,
+        recipients: list[str],
+        subject: str,
+        body: str,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        html: bool = False,
+        attachments: list[str] | None = None,
+        in_reply_to: str | None = None,
+        references: str | None = None,
+    ) -> str:
+        """
+        Create a draft email and save it to the Drafts folder.
+
+        Args:
+            recipients: List of recipient email addresses.
+            subject: Email subject.
+            body: Email body content.
+            cc: List of CC email addresses.
+            bcc: List of BCC email addresses.
+            html: Whether to send as HTML (True) or plain text (False).
+            attachments: List of file paths to attach.
+            in_reply_to: Message-ID of the email being replied to (for threading).
+            references: Space-separated Message-IDs for the thread chain.
+
+        Returns:
+            The name of the Drafts folder the message was saved to.
+        """
+
+    @abc.abstractmethod
     async def download_attachment(
         self,
         email_id: str,

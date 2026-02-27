@@ -940,6 +940,97 @@ class EmailClient:
             except Exception as e:
                 logger.debug(f"Error during logout: {e}")
 
+    async def _find_drafts_folder_by_flag(self, imap) -> str | None:
+        """Find the Drafts folder by searching for the \\Drafts special-use attribute (RFC 6154).
+
+        Args:
+            imap: Connected IMAP client
+
+        Returns:
+            The folder name with the \\Drafts attribute, or None if not found
+        """
+        try:
+            _, folders = await imap.list('""', "*")
+
+            for folder in folders:
+                folder_str = folder.decode("utf-8") if isinstance(folder, bytes) else str(folder)
+                if r"\Drafts" in folder_str or "\\Drafts" in folder_str:
+                    parts = folder_str.split('"')
+                    if len(parts) >= 3:
+                        folder_name = parts[-2]
+                        logger.info(f"Found Drafts folder by \\Drafts flag: '{folder_name}'")
+                        return folder_name
+        except Exception as e:
+            logger.debug(f"Error finding Drafts folder by flag: {e}")
+
+        return None
+
+    async def append_to_drafts(
+        self,
+        msg: MIMEText | MIMEMultipart,
+        incoming_server: EmailServer,
+    ) -> str:
+        """Append a message to the IMAP Drafts folder.
+
+        Args:
+            msg: The email message to save as a draft
+            incoming_server: IMAP server configuration for accessing the Drafts folder
+
+        Returns:
+            The name of the Drafts folder used
+
+        Raises:
+            ValueError: If no valid Drafts folder could be found
+        """
+        if incoming_server.use_ssl:
+            imap_ssl_context = _create_ssl_context(incoming_server.verify_ssl)
+            imap = aioimaplib.IMAP4_SSL(incoming_server.host, incoming_server.port, ssl_context=imap_ssl_context)
+        else:
+            imap = aioimaplib.IMAP4(incoming_server.host, incoming_server.port)
+
+        try:
+            await imap._client_task
+            await imap.wait_hello_from_server()
+            await imap.login(incoming_server.user_name, incoming_server.password)
+            await _send_imap_id(imap)
+
+            folder = await self._find_drafts_folder_by_flag(imap)
+
+            if not folder:
+                error = "Could not find a valid Drafts folder to save the draft"
+                logger.error(error)
+                raise ValueError(error)
+
+            logger.debug(f"Trying Drafts folder: '{folder}'")
+            result = await imap.select(_quote_mailbox(folder))
+
+            status = result[0] if isinstance(result, tuple) else result
+            append_status = None
+            if str(status).upper() == "OK":
+                msg_bytes = msg.as_bytes()
+                logger.debug(f"Appending draft to '{folder}'")
+                append_result = await imap.append(
+                    msg_bytes,
+                    mailbox=_quote_mailbox(folder),
+                    flags=r"(\Draft)",
+                )
+                append_status = append_result[0] if isinstance(append_result, tuple) else append_result
+                if str(append_status).upper() == "OK":
+                    logger.info(f"Saved draft to '{folder}'")
+                    return folder
+            else:
+                logger.debug(f"Folder '{folder}' select returned: {status}")
+
+            error = f"Failed to append draft to '{folder}': {append_status}"
+            logger.error(error)
+            raise ValueError(error)
+
+        finally:
+            try:
+                await imap.logout()
+            except Exception as e:
+                logger.debug(f"Error during logout: {e}")
+
     async def delete_emails(self, email_ids: list[str], mailbox: str = "INBOX") -> tuple[list[str], list[str]]:
         """Delete emails by their UIDs. Returns (deleted_ids, failed_ids)."""
         imap = self._imap_connect()
@@ -1094,6 +1185,56 @@ class ClassicEmailHandler(EmailHandler):
                 )
             except Exception as e:
                 logger.error(f"Failed to save email to Sent folder: {e}", exc_info=True)
+
+    async def create_draft(
+        self,
+        recipients: list[str],
+        subject: str,
+        body: str,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        html: bool = False,
+        attachments: list[str] | None = None,
+        in_reply_to: str | None = None,
+        references: str | None = None,
+    ) -> str:
+        """Create a draft email and save it to the Drafts folder."""
+        # Build the message (reuse outgoing_client's message-building logic)
+        if attachments:
+            msg = self.outgoing_client._create_message_with_attachments(body, html, attachments)
+        else:
+            content_type = "html" if html else "plain"
+            msg = MIMEText(body, content_type, "utf-8")
+
+        if any(ord(c) > 127 for c in subject):
+            msg["Subject"] = Header(subject, "utf-8")
+        else:
+            msg["Subject"] = subject
+
+        sender = f"{self.email_settings.full_name} <{self.email_settings.email_address}>"
+        if any(ord(c) > 127 for c in sender):
+            msg["From"] = Header(sender, "utf-8")
+        else:
+            msg["From"] = sender
+
+        msg["To"] = ", ".join(recipients)
+
+        if cc:
+            msg["Cc"] = ", ".join(cc)
+
+        if in_reply_to:
+            msg["In-Reply-To"] = in_reply_to
+        if references:
+            msg["References"] = references
+
+        msg["Date"] = email.utils.formatdate(localtime=True)
+        sender_domain = self.email_settings.email_address.rsplit("@", 1)[-1]
+        msg["Message-Id"] = email.utils.make_msgid(domain=sender_domain)
+
+        return await self.outgoing_client.append_to_drafts(
+            msg,
+            self.email_settings.incoming,
+        )
 
     async def delete_emails(self, email_ids: list[str], mailbox: str = "INBOX") -> tuple[list[str], list[str]]:
         """Delete emails by their UIDs. Returns (deleted_ids, failed_ids)."""
