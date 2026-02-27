@@ -361,81 +361,97 @@ class TestMcpTools:
     @pytest.mark.asyncio
     async def test_send_email(self):
         """Test send_email MCP tool."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
         # Mock the dispatch_handler function
         mock_handler = AsyncMock()
 
-        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
-            # Call the function
-            result = await send_email(
-                account_name="test_account",
-                recipients=["recipient@example.com"],
-                subject="Test Subject",
-                body="Test Body",
-                cc=["cc@example.com"],
-                bcc=["bcc@example.com"],
-            )
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                # Call the function
+                result = await send_email(
+                    account_name="test_account",
+                    recipients=["recipient@example.com"],
+                    subject="Test Subject",
+                    body="Test Body",
+                    cc=["cc@example.com"],
+                    bcc=["bcc@example.com"],
+                )
 
-            # Verify the return value
-            assert result == "Email sent successfully to recipient@example.com"
+                # Verify the return value
+                assert result == "Email sent successfully to recipient@example.com"
 
-            # Verify send_email was called correctly
-            mock_handler.send_email.assert_called_once_with(
-                ["recipient@example.com"],
-                "Test Subject",
-                "Test Body",
-                ["cc@example.com"],
-                ["bcc@example.com"],
-                False,
-                None,
-                None,  # in_reply_to
-                None,  # references
-            )
+                # Verify send_email was called correctly
+                mock_handler.send_email.assert_called_once_with(
+                    ["recipient@example.com"],
+                    "Test Subject",
+                    "Test Body",
+                    ["cc@example.com"],
+                    ["bcc@example.com"],
+                    False,
+                    None,
+                    None,  # in_reply_to
+                    None,  # references
+                )
 
     @pytest.mark.asyncio
     async def test_delete_emails(self):
         """Test delete_emails MCP tool."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
         mock_handler = AsyncMock()
         mock_handler.delete_emails.return_value = (["12345", "12346"], [])
 
-        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
-            result = await delete_emails(
-                account_name="test_account",
-                email_ids=["12345", "12346"],
-            )
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                result = await delete_emails(
+                    account_name="test_account",
+                    email_ids=["12345", "12346"],
+                )
 
-            assert result == "Successfully deleted 2 email(s)"
-            mock_handler.delete_emails.assert_called_once_with(["12345", "12346"], "INBOX")
+                assert result == "Successfully deleted 2 email(s)"
+                mock_handler.delete_emails.assert_called_once_with(["12345", "12346"], "INBOX")
 
     @pytest.mark.asyncio
     async def test_delete_emails_with_failures(self):
         """Test delete_emails MCP tool with some failures."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
         mock_handler = AsyncMock()
         mock_handler.delete_emails.return_value = (["12345"], ["12346", "12347"])
 
-        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
-            result = await delete_emails(
-                account_name="test_account",
-                email_ids=["12345", "12346", "12347"],
-            )
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                result = await delete_emails(
+                    account_name="test_account",
+                    email_ids=["12345", "12346", "12347"],
+                )
 
-            assert result == "Successfully deleted 1 email(s), failed to delete 2 email(s): 12346, 12347"
-            mock_handler.delete_emails.assert_called_once_with(["12345", "12346", "12347"], "INBOX")
+                assert result == "Successfully deleted 1 email(s), failed to delete 2 email(s): 12346, 12347"
+                mock_handler.delete_emails.assert_called_once_with(["12345", "12346", "12347"], "INBOX")
 
     @pytest.mark.asyncio
     async def test_delete_emails_with_mailbox(self):
         """Test delete_emails MCP tool with custom mailbox."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
         mock_handler = AsyncMock()
         mock_handler.delete_emails.return_value = (["12345"], [])
 
-        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
-            result = await delete_emails(
-                account_name="test_account",
-                email_ids=["12345"],
-                mailbox="Trash",
-            )
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                result = await delete_emails(
+                    account_name="test_account",
+                    email_ids=["12345"],
+                    mailbox="Trash",
+                )
 
-            assert result == "Successfully deleted 1 email(s)"
-            mock_handler.delete_emails.assert_called_once_with(["12345"], "Trash")
+                assert result == "Successfully deleted 1 email(s)"
+                mock_handler.delete_emails.assert_called_once_with(["12345"], "Trash")
 
     @pytest.mark.asyncio
     async def test_download_attachment_disabled(self):
@@ -493,24 +509,28 @@ class TestMcpTools:
     @pytest.mark.asyncio
     async def test_send_email_with_reply_headers(self):
         """Test send_email MCP tool with reply headers."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
         mock_handler = AsyncMock()
         mock_handler.send_email = AsyncMock()
 
-        with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
-            result = await send_email(
-                account_name="test",
-                recipients=["recipient@example.com"],
-                subject="Re: Test",
-                body="Reply body",
-                in_reply_to="<original@example.com>",
-                references="<original@example.com>",
-            )
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                result = await send_email(
+                    account_name="test",
+                    recipients=["recipient@example.com"],
+                    subject="Re: Test",
+                    body="Reply body",
+                    in_reply_to="<original@example.com>",
+                    references="<original@example.com>",
+                )
 
-            mock_handler.send_email.assert_called_once()
-            call_args = mock_handler.send_email.call_args
-            # Verify in_reply_to and references were passed (positions 7 and 8 after cc, bcc, html, attachments)
-            assert "<original@example.com>" in str(call_args)
-            assert "recipient@example.com" in result
+                mock_handler.send_email.assert_called_once()
+                call_args = mock_handler.send_email.call_args
+                # Verify in_reply_to and references were passed (positions 7 and 8 after cc, bcc, html, attachments)
+                assert "<original@example.com>" in str(call_args)
+                assert "recipient@example.com" in result
 
     @pytest.mark.asyncio
     async def test_get_emails_content_includes_message_id(self):
@@ -545,6 +565,80 @@ class TestMcpTools:
             )
 
             assert result.emails[0].message_id == "<test@example.com>"
+
+
+class TestReadOnlyMode:
+    @pytest.mark.asyncio
+    async def test_send_email_blocked_in_read_only_mode(self):
+        """Test that send_email raises PermissionError when read_only is True."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = True
+
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with pytest.raises(PermissionError) as exc_info:
+                await send_email(
+                    account_name="test_account",
+                    recipients=["recipient@example.com"],
+                    subject="Test Subject",
+                    body="Test Body",
+                )
+
+            assert "read-only mode" in str(exc_info.value)
+            assert "create_draft" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_delete_emails_blocked_in_read_only_mode(self):
+        """Test that delete_emails raises PermissionError when read_only is True."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = True
+
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with pytest.raises(PermissionError) as exc_info:
+                await delete_emails(
+                    account_name="test_account",
+                    email_ids=["12345"],
+                )
+
+            assert "read-only mode" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_send_email_allowed_when_not_read_only(self):
+        """Test that send_email works normally when read_only is False."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
+        mock_handler = AsyncMock()
+
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                result = await send_email(
+                    account_name="test_account",
+                    recipients=["recipient@example.com"],
+                    subject="Test Subject",
+                    body="Test Body",
+                )
+
+                assert "Email sent successfully" in result
+                mock_handler.send_email.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_emails_allowed_when_not_read_only(self):
+        """Test that delete_emails works normally when read_only is False."""
+        mock_settings = MagicMock()
+        mock_settings.read_only = False
+
+        mock_handler = AsyncMock()
+        mock_handler.delete_emails.return_value = (["12345"], [])
+
+        with patch("mcp_email_server.app.get_settings", return_value=mock_settings):
+            with patch("mcp_email_server.app.dispatch_handler", return_value=mock_handler):
+                result = await delete_emails(
+                    account_name="test_account",
+                    email_ids=["12345"],
+                )
+
+                assert "Successfully deleted" in result
+                mock_handler.delete_emails.assert_called_once()
 
 
 class TestCreateDraft:

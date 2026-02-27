@@ -159,6 +159,13 @@ async def send_email(
         ),
     ] = None,
 ) -> str:
+    settings = get_settings()
+    if settings.read_only:
+        raise PermissionError(
+            "Cannot send emails: server is in read-only mode (MCP_EMAIL_SERVER_READ_ONLY is not set to false). "
+            "Use create_draft to save a draft instead."
+        )
+
     handler = dispatch_handler(account_name)
     await handler.send_email(
         recipients,
@@ -246,6 +253,12 @@ async def delete_emails(
     ],
     mailbox: Annotated[str, Field(default="INBOX", description="The mailbox to delete emails from.")] = "INBOX",
 ) -> str:
+    settings = get_settings()
+    if settings.read_only:
+        raise PermissionError(
+            "Cannot delete emails: server is in read-only mode (MCP_EMAIL_SERVER_READ_ONLY is not set to false)."
+        )
+
     handler = dispatch_handler(account_name)
     deleted_ids, failed_ids = await handler.delete_emails(email_ids, mailbox)
 

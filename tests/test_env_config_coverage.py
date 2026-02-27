@@ -358,3 +358,65 @@ def test_enable_attachment_download_env_overrides_toml(monkeypatch, tmp_path):
 
     settings = Settings()
     assert settings.enable_attachment_download is True
+
+
+def test_read_only_from_env_true(monkeypatch, tmp_path):
+    """Test read_only can be set to true via environment variable."""
+    config_file = tmp_path / "empty.toml"
+    config_file.write_text("")
+    monkeypatch.setenv("MCP_EMAIL_SERVER_CONFIG_PATH", str(config_file))
+
+    for key in list(os.environ.keys()):
+        if key.startswith("MCP_EMAIL_SERVER_") and "CONFIG_PATH" not in key:
+            monkeypatch.delenv(key, raising=False)
+
+    monkeypatch.setenv("MCP_EMAIL_SERVER_READ_ONLY", "true")
+
+    settings = Settings()
+    assert settings.read_only is True
+
+
+def test_read_only_from_env_false(monkeypatch, tmp_path):
+    """Test read_only can be set to false via environment variable."""
+    config_file = tmp_path / "empty.toml"
+    config_file.write_text("")
+    monkeypatch.setenv("MCP_EMAIL_SERVER_CONFIG_PATH", str(config_file))
+
+    for key in list(os.environ.keys()):
+        if key.startswith("MCP_EMAIL_SERVER_") and "CONFIG_PATH" not in key:
+            monkeypatch.delenv(key, raising=False)
+
+    monkeypatch.setenv("MCP_EMAIL_SERVER_READ_ONLY", "false")
+
+    settings = Settings()
+    assert settings.read_only is False
+
+
+def test_read_only_defaults_to_true(monkeypatch, tmp_path):
+    """Test read_only defaults to True when env var is not set."""
+    config_file = tmp_path / "empty.toml"
+    config_file.write_text("")
+    monkeypatch.setenv("MCP_EMAIL_SERVER_CONFIG_PATH", str(config_file))
+
+    for key in list(os.environ.keys()):
+        if key.startswith("MCP_EMAIL_SERVER_") and "CONFIG_PATH" not in key:
+            monkeypatch.delenv(key, raising=False)
+
+    settings = Settings()
+    assert settings.read_only is True
+
+
+def test_read_only_env_overrides_toml(monkeypatch, tmp_path):
+    """Test environment variable overrides TOML config for read_only."""
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("read_only = true\n")
+    monkeypatch.setenv("MCP_EMAIL_SERVER_CONFIG_PATH", str(config_file))
+
+    for key in list(os.environ.keys()):
+        if key.startswith("MCP_EMAIL_SERVER_") and "CONFIG_PATH" not in key:
+            monkeypatch.delenv(key, raising=False)
+
+    monkeypatch.setenv("MCP_EMAIL_SERVER_READ_ONLY", "0")
+
+    settings = Settings()
+    assert settings.read_only is False

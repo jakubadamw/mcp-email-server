@@ -227,6 +227,7 @@ class Settings(BaseSettings):
     providers: list[ProviderSettings] = []
     db_location: str = CONFIG_PATH.with_name("db.sqlite3").as_posix()
     enable_attachment_download: bool = False
+    read_only: bool = True
 
     model_config = SettingsConfigDict(toml_file=CONFIG_PATH, validate_assignment=True, revalidate_instances="always")
 
@@ -239,6 +240,12 @@ class Settings(BaseSettings):
         if env_enable_attachment is not None:
             self.enable_attachment_download = _parse_bool_env(env_enable_attachment, False)
             logger.info(f"Set enable_attachment_download={self.enable_attachment_download} from environment variable")
+
+        # Check for read_only mode from environment variable
+        env_read_only = os.getenv("MCP_EMAIL_SERVER_READ_ONLY")
+        if env_read_only is not None:
+            self.read_only = _parse_bool_env(env_read_only, True)
+            logger.info(f"Set read_only={self.read_only} from environment variable")
 
         # Check for email configuration from environment variables
         env_email = EmailSettings.from_env()
